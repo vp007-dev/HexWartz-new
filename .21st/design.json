@@ -1,7 +1,35 @@
 {
   "name": "HexWartz",
-  "stack": { "framework": "React 18", "build": "Vite 6", "styling": "CSS", "icons": "lucide-react" },
-  "tokens": { "background": "#080c12", "gold": "#e8c279", "cream": "#f8f1e2", "bodyFont": "Plus Jakarta Sans", "displayFont": "Bebas Neue", "serifFont": "Cinzel" },
-  "constraints": ["Preserve content, section geometry, intro, navigation and interactive behavior", "No new runtime dependencies", "Decorations must not intercept input", "Honor reduced motion", "No full-screen canvas or WebGL for the ambient background"],
-  "decisions": ["Refine the existing wizarding identity with midnight ink, antique gold, sparse enchanted dust and transparent Great Hall candles", "Retain the existing transparent character and crest artwork", "Use static fine-line crest rings and softer button glows"]
+  "stack": {
+    "framework": "React 18",
+    "build": "Vite 6",
+    "styling": "CSS",
+    "icons": "lucide-react"
+  },
+  "tokens": {
+    "background": "#080c12",
+    "gold": "#e8c279",
+    "cream": "#f8f1e2",
+    "bodyFont": "Plus Jakarta Sans",
+    "displayFont": "Bebas Neue",
+    "serifFont": "Cinzel"
+  },
+  "constraints": [
+    "Preserve information sections, intro, navigation and interactive behavior; the venue may expand into a cinematic scroll sequence",
+    "No new runtime dependencies",
+    "Decorations must not intercept input",
+    "Honor reduced motion",
+    "No full-screen canvas or WebGL for the ambient background"
+  ],
+  "decisions": [
+    "Refine the existing wizarding identity with midnight ink, antique gold, sparse enchanted dust and transparent Great Hall candles",
+    "Retain the existing transparent character and crest artwork",
+    "Use static fine-line crest rings and softer button glows",
+    "Use a native-scroll three-scene journey with gentle image zooms, crossfades and accessible chapter buttons",
+    "Distinguish the imagined castle from the real daytime campus, and add a subdued Great Hall backdrop to the house section",
+    "Give the house, codex and prize headings matching transparent hat, spellbook and goblet illustrations with reserved space and no added motion",
+    "Preserve the user-preferred flying owl-post letter and visible label throughout scrolling; do not dock or hide it during visual refinements",
+    "The user rejected the moonlit castle image: keep it out of the page and hero; retain the campus day/night journey and flying letter",
+    "Use a crisp transparent parchment image for Enter without blur, glow or floating motion; responsive menus and card grids must fit phone, tablet, laptop and landscape screens"
+  ]
 }

@@ -62,6 +62,7 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('.magic-mote').count(), 14);
         assert.ok(await page.locator('.hero-floating-candles').evaluate(image => image.complete && image.naturalWidth > 0));
         assert.equal(await page.evaluate(() => performance.getEntriesByType('resource').some(r => r.name.includes('Gemini_Generated_Image_izvipmizvipmizvi'))), false, 'The old large backdrop must not download');
+        assert.equal(await page.evaluate(() => performance.getEntriesByType('resource').some(r => r.name.includes('moonlit-castle'))), false, 'The removed castle image must not download');
         if (name === 'mobile') {
           const candle = await page.locator('.hero-floating-candles').boundingBox();
           const guidelines = await page.locator('.hero-btn-secondary').boundingBox();
@@ -73,15 +74,19 @@ const { chromium } = require('playwright');
         }
       }
       // Freeze only the screenshot, so animation timing and random particles do not mask visual regressions.
-      await page.evaluate(() => { document.getAnimations().forEach(a => { a.pause(); a.currentTime = 0; }); const atmosphere = document.querySelector('.enchanted-atmosphere, canvas'); if (atmosphere) atmosphere.style.visibility = 'hidden'; });
+      await page.evaluate(() => { const atmosphere = document.querySelector('.enchanted-atmosphere, canvas'); if (atmosphere) atmosphere.style.visibility = 'hidden'; });
       await page.waitForTimeout(150);
       const layout = await page.locator('main > section, header, footer').evaluateAll(es => es.map(e => ({ className: e.className.replace(/\s*animations-paused/g, ''), width: e.getBoundingClientRect().width, height: e.getBoundingClientRect().height })));
-      await page.screenshot({ path: path.join(output, `${baseline ? 'before' : 'after'}-${name}.png`) });
+      const cutoutHeight = await page.locator('.section-cutout').count() ? await page.locator('.section-cutout').first().evaluate(image => image.offsetHeight + parseFloat(getComputedStyle(image).marginBottom)) : 0;
+      await page.screenshot({ path: path.join(output, `${baseline ? 'before' : 'after'}-${name}.png`), animations: 'disabled' });
       if (!baseline) {
         const baselinePath = path.join(output, 'baseline.json');
         if (fs.existsSync(baselinePath)) {
           const previous = JSON.parse(fs.readFileSync(baselinePath))[name];
-          assert.deepEqual(layout, previous.layout, `${name}: section geometry changed`);
+          // The cinematic venue deliberately gets more scroll space; the information sections stay intact.
+          const information = rows => rows.filter(row => !row.className.includes('campus-showcase'));
+          const expected = previous.layout.map(row => /challenge-section|tournament-codex-section|prizes-section/.test(row.className) ? { ...row, height: row.height + cutoutHeight - (previous.cutoutHeight || 0) } : row);
+          assert.deepEqual(information(layout), information(expected), `${name}: information section geometry changed beyond the artwork space`);
         }
         assert.equal(intro.layoutReads, 0, 'Hidden envelope must not measure layout during the intro');
         assert.equal(hero.LayoutCount, 0, 'Offscreen animations must not cause idle layout');
@@ -92,6 +97,61 @@ const { chromium } = require('playwright');
         return window.__reads - start;
       });
       if (!baseline) assert.ok(scrollReads < 150, `Scroll performs too many layout reads: ${scrollReads}`);
+      if (!baseline) {
+        const positions = await page.locator('.cinematic-journey').evaluate(section => {
+          const stage = section.querySelector('.cinematic-stage');
+          const top = section.getBoundingClientRect().top + window.scrollY - parseFloat(getComputedStyle(stage).top);
+          return { top, distance: section.offsetHeight - stage.offsetHeight };
+        });
+        const letterPositions = [];
+        assert.equal(await page.locator('.journey-scene').count(), 2);
+        for (const [chapter, progress] of [[0, 0.2], [1, 0.78]]) {
+          await page.evaluate(({ top, distance, progress }) => window.scrollTo({ top: top + distance * progress, behavior: 'instant' }), { ...positions, progress });
+          await page.waitForTimeout(100);
+          assert.equal(await page.locator('.journey-chapter').nth(chapter).getAttribute('aria-pressed'), 'true');
+          assert.equal(await page.locator('.journey-scene').nth(chapter).getAttribute('aria-hidden'), 'false');
+          assert.equal(await page.locator('.scrolling-seal-guide').isVisible(), true, 'Keep the letter visible throughout the scroll journey');
+          letterPositions.push(await page.locator('.scrolling-seal-guide').evaluate(e => getComputedStyle(e).transform));
+          const music = await page.locator('.floating-music-orb').boundingBox();
+          const chapterBar = await page.locator('.journey-chapters').boundingBox();
+          assert.ok(music.y + music.height <= chapterBar.y, 'Music controls must not overlap the chapter controls');
+          await page.waitForFunction(index => { const image = document.querySelectorAll('.journey-scene img')[index]; return image.complete && image.naturalWidth > 0; }, chapter);
+          assert.ok(await page.locator('.journey-scene img').nth(chapter).evaluate(e => new DOMMatrix(getComputedStyle(e).transform).a > 1.03), 'The active scene should zoom with scrolling');
+          await page.screenshot({ path: path.join(output, `scene-${chapter + 1}-${name}.png`) });
+        }
+        assert.ok(new Set(letterPositions).size > 1, 'The letter must fly as the page scrolls');
+        await page.locator('.journey-chapter').first().click();
+        await page.waitForFunction(() => document.querySelector('.journey-chapter').getAttribute('aria-pressed') === 'true');
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.waitForFunction(() => getComputedStyle(document.querySelector('.journey-scene img')).transform === 'none');
+        assert.equal(await page.locator('.journey-scene img').first().evaluate(e => getComputedStyle(e).transform), 'none');
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.locator('.journey-next').click();
+        await page.waitForFunction(() => Math.abs(document.querySelector('#houses').getBoundingClientRect().top) < 200);
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'The story must not create horizontal overflow');
+      }
+      if (!baseline) {
+        assert.equal(await page.locator('.section-cutout').count(), 3);
+        for (const id of ['challenge', 'journey', 'prizes']) {
+          const section = page.locator(`#${id}`);
+          await section.locator('.has-section-cutout').evaluate(header => header.scrollIntoView({ block: 'start', behavior: 'instant' }));
+          await page.waitForFunction(sectionId => { const image = document.querySelector(`#${sectionId} .section-cutout`); return image.complete && image.naturalWidth > 0; }, id);
+          const image = section.locator('.section-cutout');
+          assert.equal(await image.getAttribute('aria-hidden'), 'true');
+          assert.equal(await image.evaluate(e => getComputedStyle(e).pointerEvents), 'none');
+          const artBox = await image.boundingBox();
+          const titleBox = await section.locator('h2').boundingBox();
+          assert.ok(artBox.y + artBox.height <= titleBox.y, 'Section art must not overlap its heading');
+          assert.ok(await page.locator('.scrolling-seal-guide').evaluate(e => e.offsetWidth > 56), 'Preserve the full-size flying letter');
+          assert.notEqual(await page.locator('.scrolling-seal-guide').evaluate(e => getComputedStyle(e).transform), 'none');
+          assert.equal(await page.locator('.letter-guide-label').evaluate(e => getComputedStyle(e).opacity), '1');
+          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+          await page.screenshot({ path: path.join(output, `cutout-${id}-${name}.png`), animations: 'disabled' });
+        }
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+        await page.waitForFunction(() => !document.querySelector('.scrolling-seal-guide').classList.contains('is-guiding'));
+        assert.ok(await page.locator('.scrolling-seal-guide').evaluate(e => e.offsetWidth > 56), 'The guide must return to its hero size');
+      }
       await page.getByRole('button', { name: 'Tap to probe the enchanted vault lock' }).click();
       assert.ok(await page.locator('.proper-probe-btn').evaluate(e => e.classList.contains('is-resonating')));
       const faq = page.locator('.faq-question-btn').nth(1);
@@ -127,7 +187,7 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('.hero-floating-candles').evaluate(e => getComputedStyle(e).animationName), 'none');
         await page.emulateMedia({ reducedMotion: 'no-preference' });
       }
-      results[name] = { intro, hero, scrollReads, layout };
+      results[name] = { intro, hero, scrollReads, layout, cutoutHeight };
       await page.close();
     }
     fs.writeFileSync(path.join(output, baseline ? 'baseline.json' : 'optimized.json'), JSON.stringify(results, null, 2));

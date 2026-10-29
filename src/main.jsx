@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowDown, ArrowUpRight, Award, BookOpen, CalendarDays, ChevronDown, ChevronRight, ChevronUp, Clock, Lock, MapPin, Menu, Music, Scroll, ShieldAlert, Sparkles, Trophy, Users, Volume2, VolumeX, X, Zap } from 'lucide-react';
 import EnchantedAtmosphere from './EnchantedAtmosphere';
+import CinematicJourney from './CinematicJourney';
 import './styles.css';
 
 const HOUSE_TRACKS = [
@@ -85,7 +86,6 @@ const GUIDE_STOPS = [
 
 export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showNightCampus, setShowNightCampus] = useState(false);
   const [activeGuideIndex, setActiveGuideIndex] = useState(0);
   const [prophetPlaying, setProphetPlaying] = useState(false);
   const [wardResonating, setWardResonating] = useState(false);
@@ -93,20 +93,42 @@ export function App() {
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   
   // Starting Screen & Video Sequence State
-  const [introState, setIntroState] = useState('initial'); // 'initial' | 'playing' | 'exiting' | 'entered'
+  const [introState, setIntroState] = useState('initial'); // 'initial' | 'buffering' | 'playing' | 'exiting' | 'entered'
   const [introFading, setIntroFading] = useState(false);
+  const [introVideoUrl, setIntroVideoUrl] = useState(undefined);
   const audioRef = useRef(null);
   const introVideoRef = useRef(null);
   const envelopeRef = useRef(null);
   const soundContextRef = useRef(null);
-  const introFrameRef = useRef(0);
   const revealTimerRef = useRef(0);
   const wardTimerRef = useRef(0);
   const prophetTimerRef = useRef(0);
   const siteVisible = introState === 'exiting' || introState === 'entered';
+  const introComplete = introState === 'entered';
+
+  useEffect(() => {
+    if (introComplete) return undefined;
+    const controller = new AbortController();
+    let videoUrl;
+    // Native preload may stop early; a local Blob keeps the complete short clip available.
+    fetch('/video/hexwartz-intro.mp4', { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error('Intro video download failed');
+        return response.blob();
+      })
+      .then(blob => {
+        if (controller.signal.aborted) return;
+        videoUrl = URL.createObjectURL(blob);
+        setIntroVideoUrl(videoUrl);
+      })
+      .catch(() => { if (!controller.signal.aborted) triggerSiteReveal(); });
+    return () => {
+      controller.abort();
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+    };
+  }, [introComplete]);
 
   useEffect(() => () => {
-    cancelAnimationFrame(introFrameRef.current);
     clearTimeout(revealTimerRef.current);
     clearTimeout(wardTimerRef.current);
     clearTimeout(prophetTimerRef.current);
@@ -140,31 +162,19 @@ export function App() {
     // 2. Play Web Audio wand chime
     playParchmentSound();
 
-    // 3. Start Video zooming sequence
-    setIntroState('playing');
-    const video = introVideoRef.current;
-    if (video) {
-      video.currentTime = 0;
-      video.play().catch(() => triggerSiteReveal());
+    setIntroState('buffering');
+    startIntroPlayback();
+  };
 
-      // As requested: the video zooms into nothingness around ~5.5s to 6.2s.
-      // The remaining part is long so we trigger a smooth fade-out and load the website
-      // exactly at the golden nexus / vortex burst (~5.8s) before the video finishes!
-      const checkTime = () => {
-        if (!video) return;
-        if (video.currentTime >= 5.8) {
-          triggerSiteReveal();
-        } else {
-          introFrameRef.current = requestAnimationFrame(checkTime);
-        }
-      };
-      introFrameRef.current = requestAnimationFrame(checkTime);
-    }
+  const startIntroPlayback = () => {
+    const video = introVideoRef.current;
+    if (!video || !introVideoUrl || revealTimerRef.current || video.readyState < 2) return;
+    setIntroState('playing');
+    video.play().catch(() => triggerSiteReveal());
   };
 
   const triggerSiteReveal = () => {
     if (revealTimerRef.current) return;
-    cancelAnimationFrame(introFrameRef.current);
     setIntroFading(true);
     setIntroState('exiting');
     revealTimerRef.current = setTimeout(() => {
@@ -442,7 +452,6 @@ export function App() {
       envelope.classList.toggle('is-guiding', guiding);
       envelope.style.pointerEvents = guiding ? 'auto' : 'none';
       setActiveGuideIndex((current) => current === guideIndex ? current : guideIndex);
-      setShowNightCampus(scrollY >= venueTop + viewportHeight * 0.72);
     };
 
     function animateEnvelope(time) {
@@ -501,6 +510,7 @@ export function App() {
     const observer = new ResizeObserver(refreshLayout);
     sections.filter(Boolean).forEach(section => observer.observe(section));
     observer.observe(document.querySelector('.landing-header'));
+    observer.observe(envelope);
     window.addEventListener('scroll', scheduleUpdate, { passive: true });
     window.addEventListener('resize', refreshLayout);
     document.addEventListener('visibilitychange', scheduleUpdate);
@@ -527,20 +537,20 @@ export function App() {
           <video
             ref={introVideoRef}
             className="intro-video-element"
-            src="/video/gemini_generated_video_f933aace.mp4"
+            src={introVideoUrl}
+            poster="/assets/intro/video-poster.webp"
             preload="auto"
             muted
             playsInline
             webkit-playsinline="true"
             x5-playsinline="true"
+            onLoadedData={() => { if (introState === 'buffering') startIntroPlayback(); }}
             onEnded={triggerSiteReveal}
+            onError={triggerSiteReveal}
           />
 
-          {/* Vignette & Ambient Shimmer */}
-          <div className="intro-ambient-vignette" />
-
           {/* Starting Screen UI with ENTER Button positioned right under the Title */}
-          {introState === 'initial' && (
+          {(introState === 'initial' || introState === 'buffering') && (
             <div className="intro-ui-container">
               
               {/* Skip / Direct Entry quick badge */}
@@ -563,24 +573,22 @@ export function App() {
                   className="intro-parchment-enter-btn"
                   onClick={handleEnterCastle}
                   aria-label="Enter HexWartz Hackathon"
+                  disabled={introState === 'buffering'}
+                  aria-busy={introState === 'buffering'}
                 >
-                  {/* Glowing Flourish Aura */}
-                  <div className="parchment-btn-glow" aria-hidden="true" />
-                  
-                  {/* Authentic Golden Parchment Plaque */}
-                  <div className="parchment-plaque-shell">
-                    <img 
-                      src="/assets/intro/enter_button_clean.webp"
-                      alt="ENTER" 
-                      className="parchment-plaque-img"
-                    />
-                    <div className="parchment-spark-dot" aria-hidden="true" />
-                  </div>
+                  <img
+                    src="/assets/intro/enter-button-transparent.webp"
+                    alt=""
+                    aria-hidden="true"
+                    className="parchment-plaque-img"
+                    width="720"
+                    height="240"
+                  />
                 </button>
 
                 {/* Subtitle prompt */}
-                <p className="intro-prompt-sub font-arcane">
-                  TAP TO AWAKEN THE WARDS & ENTER PLATFORM 9¾
+                <p className="intro-prompt-sub font-arcane" role="status">
+                  {introState === 'buffering' ? 'PREPARING YOUR CINEMATIC ENTRANCE…' : 'TAP TO AWAKEN THE WARDS & ENTER PLATFORM 9¾'}
                 </p>
 
               </div>
@@ -606,6 +614,7 @@ export function App() {
         </div>
       )}
 
+      {siteVisible && <>
       <EnchantedAtmosphere enabled={siteVisible} />
       <a
         ref={envelopeRef}
@@ -791,36 +800,12 @@ export function App() {
           <div className="landing-hero-bottomline"><span>HEXWARTZ 2026</span><span>FOUR HOUSES · ONE GRAND CHALLENGE</span><span>SCROLL TO EXPLORE ↓</span></div>
         </section>
 
-        <section className="campus-showcase" id="venue" aria-label="Sharda University Agra by day and night">
-          <div className="campus-showcase-sticky">
-            <img
-              className={`campus-showcase-image ${showNightCampus ? 'is-hidden' : 'is-visible'}`}
-              src="/assets/v2/sharda%20agra.jpg"
-              alt="Sharda University Agra campus in daylight"
-              loading="lazy"
-              decoding="async"
-              fetchPriority="low"
-            />
-            <img
-              className={`campus-showcase-image ${showNightCampus ? 'is-visible' : 'is-hidden'}`}
-              src="/assets/v2/Gemini_Generated_Image_msm9x2msm9x2msm9-clean.webp"
-              alt="Sharda University Agra campus at night"
-              loading="lazy"
-              decoding="async"
-              fetchPriority="low"
-            />
-            <div className="campus-showcase-shade" />
-            <div className="campus-showcase-caption">
-              <span>OFFICIAL VENUE</span>
-              <strong>SHARDA UNIVERSITY, AGRA</strong>
-              <small>Anand School of Engineering and Technology</small>
-            </div>
-            <span className="campus-showcase-scroll-hint" aria-hidden="true">SCROLL TO EXPLORE ↓</span>
-          </div>
-        </section>
+        <CinematicJourney enabled={siteVisible} />
 
         <section className="landing-section challenge-section" id="challenge" aria-labelledby="challenge-title">
-          <div className="landing-section-head">
+          <div className="house-hall-backdrop" aria-hidden="true"><img src="/assets/scenes/great-hall.webp" alt="" loading="lazy" decoding="async" /></div>
+          <div className="landing-section-head has-section-cutout">
+            <img className="section-cutout" src="/assets/cutouts/sorting-hat.webp" alt="" aria-hidden="true" width="384" height="384" loading="lazy" decoding="async" />
             <p className="section-kicker section-kicker-sparkles">
               <Sparkles size={15} className="kicker-sparkle" />
               <span>GREAT HALL ENCHANTMENT · LIVE HOUSE STANDINGS</span>
@@ -872,7 +857,8 @@ export function App() {
         </section>
 
         <section className="landing-section tournament-codex-section journey-section" id="journey" aria-labelledby="codex-title">
-          <div className="landing-section-head">
+          <div className="landing-section-head has-section-cutout">
+            <img className="section-cutout section-cutout-book" src="/assets/cutouts/spellbook-quill.webp" alt="" aria-hidden="true" width="384" height="384" loading="lazy" decoding="async" />
             <div className="section-kicker-sparkles">
               <Sparkles size={14} className="kicker-sparkle" />
               <span>MINISTRY DECREE NO. 36 · OFFICIAL PROTOCOLS</span>
@@ -1148,7 +1134,8 @@ export function App() {
           <div className="prizes-container">
             
             {/* Clean Section Head */}
-            <div className="landing-section-head">
+            <div className="landing-section-head has-section-cutout">
+              <img className="section-cutout section-cutout-trophy" src="/assets/cutouts/tournament-goblet.webp" alt="" aria-hidden="true" width="384" height="384" loading="lazy" decoding="async" />
               <div className="section-kicker-sparkles">
                 <Sparkles size={14} className="kicker-sparkle" />
                 <span>MINISTRY OF MAGIC · HIGH-SECURITY ARCHIVES</span>
@@ -1489,6 +1476,8 @@ export function App() {
         <p>13–14 November 2026 <span>·</span> Anand School of Engineering and Technology</p>
         <a href="#home" className="back-to-top">Back to top ↑</a>
       </footer>
+
+      </>}
 
       {/* Background Audio Element */}
       <audio 
