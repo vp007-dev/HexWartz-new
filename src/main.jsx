@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowDown, ArrowUpRight, Award, BookOpen, CalendarDays, ChevronDown, ChevronRight, ChevronUp, Clock, Lock, MapPin, Menu, Music, Scroll, ShieldAlert, Sparkles, Trophy, Users, Volume2, VolumeX, X, Zap } from 'lucide-react';
-import LumosCanvas from './LumosCanvas';
+import EnchantedAtmosphere from './EnchantedAtmosphere';
 import './styles.css';
 
 const HOUSE_TRACKS = [
@@ -606,7 +606,7 @@ export function App() {
         </div>
       )}
 
-      <LumosCanvas enabled={siteVisible} />
+      <EnchantedAtmosphere enabled={siteVisible} />
       <a
         ref={envelopeRef}
         className="scrolling-seal-guide"
@@ -762,6 +762,15 @@ export function App() {
             </div>
 
             <div className="landing-hero-art-wrap">
+              <img
+                className="hero-floating-candles"
+                src="/assets/v2/great-hall-candles.webp"
+                alt=""
+                aria-hidden="true"
+                width="256"
+                height="384"
+                decoding="async"
+              />
               <div className="landing-art-frame">
                 <img
                   className="landing-hero-art"

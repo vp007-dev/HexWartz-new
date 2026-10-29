@@ -75,12 +75,36 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Background Particle Canvas */
-.lumos-particle-canvas {
+/* Sparse enchanted dust uses compositor animation, without a full-screen canvas loop. */
+.enchanted-atmosphere {
   position: fixed;
   inset: 0;
+  overflow: hidden;
+  contain: strict;
   pointer-events: none;
   z-index: 1;
+}
+
+.magic-mote {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #dcc08a;
+  box-shadow: 0 0 7px rgba(220, 192, 138, 0.25);
+  opacity: 0.2;
+  animation: enchanted-drift var(--duration) ease-in-out var(--delay) infinite alternate;
+}
+
+.magic-mote:nth-child(4n) {
+  width: 4px;
+  height: 4px;
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+}
+
+@keyframes enchanted-drift {
+  from { transform: translate3d(0, 8px, 0); opacity: 0.12; }
+  to { transform: translate3d(5px, -16px, 0); opacity: 0.44; }
 }
 
 /* Resume the same animations before their section enters the viewport. */
@@ -2196,10 +2220,10 @@ html {
 
 body {
   color: #f8f1e2;
-  background-color: #090807;
+  background-color: #080c12;
   background-image:
-    linear-gradient(180deg, rgba(7, 7, 8, 0.77), rgba(8, 7, 7, 0.88)),
-    url('/assets/v2/Gemini_Generated_Image_izvipmizvipmizvi-clean.webp');
+    radial-gradient(ellipse at 78% 12%, rgba(45, 64, 86, 0.27), transparent 58%),
+    radial-gradient(ellipse at 16% 74%, rgba(96, 67, 32, 0.12), transparent 56%);
   background-position: center top;
   background-size: cover;
   background-attachment: fixed;
@@ -3685,9 +3709,8 @@ html { scroll-padding-top: 92px; }
   min-height: min(960px, calc(100svh - 82px));
   padding: clamp(34px, 4vw, 58px) clamp(20px, 4.5vw, 68px) 30px;
   background:
-    radial-gradient(ellipse at 65% 38%, rgba(229, 177, 86, 0.16), transparent 48%),
-    radial-gradient(ellipse at 35% 46%, rgba(113, 69, 33, 0.14), transparent 54%),
-    linear-gradient(180deg, rgba(7, 7, 8, 0.3), rgba(7, 7, 8, 0.85));
+    radial-gradient(ellipse at 72% 42%, rgba(149, 117, 62, 0.12), transparent 44%),
+    linear-gradient(180deg, rgba(8, 12, 18, 0.2), rgba(8, 10, 14, 0.88));
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -3920,14 +3943,14 @@ html { scroll-padding-top: 92px; }
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-decoration: none;
-  box-shadow: 0 0 28px rgba(220, 165, 55, 0.45), 0 4px 15px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 20px rgba(220, 165, 55, 0.18), 0 4px 15px rgba(0, 0, 0, 0.4);
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 .hero-btn-primary:hover {
   transform: translateY(-2px);
   filter: brightness(1.08);
-  box-shadow: 0 0 38px rgba(220, 165, 55, 0.65), 0 6px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 28px rgba(220, 165, 55, 0.28), 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 .hero-btn-secondary {
@@ -4010,15 +4033,13 @@ html { scroll-padding-top: 92px; }
 
 .landing-art-frame::before {
   inset: -13px;
-  border: 1px solid rgba(235, 196, 119, 0.4);
-  box-shadow: 0 0 30px rgba(231, 184, 98, 0.12), inset 0 0 30px rgba(231, 184, 98, 0.06);
-  animation: crest-ring-drift 26s linear infinite;
+  border: 1px solid rgba(235, 196, 119, 0.24);
+  box-shadow: 0 0 40px rgba(231, 184, 98, 0.06);
 }
 
 .landing-art-frame::after {
   inset: -27px;
-  border: 1px dashed rgba(235, 196, 119, 0.23);
-  animation: crest-ring-drift 42s linear infinite reverse;
+  border: 1px solid rgba(235, 196, 119, 0.1);
 }
 
 .landing-hero-art {
@@ -4027,9 +4048,25 @@ html { scroll-padding-top: 92px; }
   display: block;
   border-radius: 0;
   object-fit: contain;
-  mix-blend-mode: screen;
+  mix-blend-mode: normal;
   filter: drop-shadow(0 22px 45px rgba(0, 0, 0, 0.45));
   animation: crest-hover 7s ease-in-out infinite;
+}
+
+.hero-floating-candles {
+  position: absolute;
+  z-index: 2;
+  top: -23%;
+  right: -10%;
+  width: clamp(80px, 9vw, 125px);
+  height: auto;
+  pointer-events: none;
+  animation: candle-hover 9s ease-in-out infinite alternate;
+}
+
+@keyframes candle-hover {
+  from { transform: translate3d(0, 0, 0) rotate(-2deg); }
+  to { transform: translate3d(-3px, -8px, 0) rotate(1deg); }
 }
 
 /* Prize Callout matching Image 3 */
@@ -4309,6 +4346,8 @@ html { scroll-padding-top: 92px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .magic-mote,
+  .hero-floating-candles,
   .landing-art-frame::before,
   .landing-art-frame::after,
   .landing-hero-art { animation: none !important; }
@@ -4356,6 +4395,7 @@ html { scroll-padding-top: 92px; }
 
 .landing-nav .landing-nav-cta {
   min-height: 36px;
+  color: #21170a;
   padding: 8px 14px;
   border: 1px solid rgba(255, 238, 192, 0.62);
   border-radius: 999px;
@@ -5771,6 +5811,12 @@ html { scroll-padding-top: 92px; }
 
 .intro-parchment-enter-btn:active {
   transform: translateY(-2px) scale(0.97);
+}
+
+.intro-parchment-enter-btn:focus-visible,
+.floating-music-orb:focus-visible {
+  outline: 2px solid var(--accent-gold-bright);
+  outline-offset: 6px;
 }
 
 .parchment-btn-glow {

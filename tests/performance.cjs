@@ -57,15 +57,14 @@ const { chromium } = require('playwright');
       await page.waitForTimeout(500);
       const hero = await sample();
       if (!baseline) {
-        assert.ok(await page.evaluate(() => window.__canvasFrames > 0));
-        await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange')); });
-        const frames = await page.evaluate(() => window.__canvasFrames);
-        await page.waitForTimeout(100);
-        assert.equal(await page.evaluate(() => window.__canvasFrames), frames, 'Hidden tabs must stop drawing particles');
-        await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); });
+        assert.equal(await page.locator('canvas').count(), 0, 'The ambient background must not use a per-frame canvas');
+        assert.equal(await page.locator('.enchanted-atmosphere').isVisible(), true);
+        assert.equal(await page.locator('.magic-mote').count(), 14);
+        assert.ok(await page.locator('.hero-floating-candles').evaluate(image => image.complete && image.naturalWidth > 0));
+        assert.equal(await page.evaluate(() => performance.getEntriesByType('resource').some(r => r.name.includes('Gemini_Generated_Image_izvipmizvipmizvi'))), false, 'The old large backdrop must not download');
       }
       // Freeze only the screenshot, so animation timing and random particles do not mask visual regressions.
-      await page.evaluate(() => { document.getAnimations().forEach(a => { a.pause(); a.currentTime = 0; }); document.querySelector('canvas').style.visibility = 'hidden'; });
+      await page.evaluate(() => { document.getAnimations().forEach(a => { a.pause(); a.currentTime = 0; }); const atmosphere = document.querySelector('.enchanted-atmosphere, canvas'); if (atmosphere) atmosphere.style.visibility = 'hidden'; });
       await page.waitForTimeout(150);
       const layout = await page.locator('main > section, header, footer').evaluateAll(es => es.map(e => ({ className: e.className.replace(/\s*animations-paused/g, ''), width: e.getBoundingClientRect().width, height: e.getBoundingClientRect().height })));
       await page.screenshot({ path: path.join(output, `${baseline ? 'before' : 'after'}-${name}.png`) });
@@ -113,6 +112,12 @@ const { chromium } = require('playwright');
         assert.ok(await page.locator('.landing-hero').isVisible());
       }
       assert.deepEqual(errors, []);
+      if (!baseline) {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        assert.equal(await page.locator('.magic-mote').first().evaluate(e => getComputedStyle(e).animationName), 'none');
+        assert.equal(await page.locator('.hero-floating-candles').evaluate(e => getComputedStyle(e).animationName), 'none');
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+      }
       results[name] = { intro, hero, scrollReads, layout };
       await page.close();
     }
