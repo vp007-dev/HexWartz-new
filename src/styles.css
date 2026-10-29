@@ -83,6 +83,16 @@ body {
   z-index: 1;
 }
 
+/* Resume the same animations before their section enters the viewport. */
+.animations-paused,
+.animations-paused *,
+.animations-paused::before,
+.animations-paused::after,
+.animations-paused *::before,
+.animations-paused *::after {
+  animation-play-state: paused !important;
+}
+
 .site-wrapper {
   position: relative;
   z-index: 2;
@@ -2189,7 +2199,7 @@ body {
   background-color: #090807;
   background-image:
     linear-gradient(180deg, rgba(7, 7, 8, 0.77), rgba(8, 7, 7, 0.88)),
-    url('/assets/v2/Gemini_Generated_Image_izvipmizvipmizvi-clean.png');
+    url('/assets/v2/Gemini_Generated_Image_izvipmizvipmizvi-clean.webp');
   background-position: center top;
   background-size: cover;
   background-attachment: fixed;

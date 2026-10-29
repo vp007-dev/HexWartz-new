@@ -12,7 +12,7 @@ const HOUSE_TRACKS = [
     tone: 'crimson',
     gem: 'Ruby',
     trait: 'Bravery & Audacity',
-    banner: '/assets/v2/house-banner-gryffindor.png',
+    banner: '/assets/v2/house-banner-gryffindor.webp',
     desc: 'Channel the courage of Godric Gryffindor to build intelligent agents, neural systems, and frontier AI/ML solutions.',
   },
   {
@@ -22,7 +22,7 @@ const HOUSE_TRACKS = [
     tone: 'blue',
     gem: 'Sapphire',
     trait: 'Wisdom & Intellect',
-    banner: '/assets/v2/house-banner-ravenclaw.png',
+    banner: '/assets/v2/house-banner-ravenclaw.webp',
     desc: 'Apply profound wisdom and analytical ingenuity to heal the world with transformative healthcare technology.',
   },
   {
@@ -32,7 +32,7 @@ const HOUSE_TRACKS = [
     tone: 'gold',
     gem: 'Topaz',
     trait: 'Loyalty & Dedication',
-    banner: '/assets/v2/house-banner-hufflepuff.png',
+    banner: '/assets/v2/house-banner-hufflepuff.webp',
     desc: 'Champion sustainable earth initiatives, clean energy, and ethical solutions with steadfast devotion.',
   },
   {
@@ -42,7 +42,7 @@ const HOUSE_TRACKS = [
     tone: 'green',
     gem: 'Emerald',
     trait: 'Ambition & Cunning',
-    banner: '/assets/v2/house-banner-slytherin.png',
+    banner: '/assets/v2/house-banner-slytherin.webp',
     desc: 'Wield raw ambition and boundless creativity to redefine possibilities across uncharted domains.',
   },
 ];
@@ -98,6 +98,28 @@ export function App() {
   const audioRef = useRef(null);
   const introVideoRef = useRef(null);
   const envelopeRef = useRef(null);
+  const soundContextRef = useRef(null);
+  const introFrameRef = useRef(0);
+  const revealTimerRef = useRef(0);
+  const wardTimerRef = useRef(0);
+  const prophetTimerRef = useRef(0);
+  const siteVisible = introState === 'exiting' || introState === 'entered';
+
+  useEffect(() => () => {
+    cancelAnimationFrame(introFrameRef.current);
+    clearTimeout(revealTimerRef.current);
+    clearTimeout(wardTimerRef.current);
+    clearTimeout(prophetTimerRef.current);
+    soundContextRef.current?.close();
+  }, []);
+
+  const getSoundContext = () => {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    const ctx = soundContextRef.current || (soundContextRef.current = new AudioCtx());
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    return ctx;
+  };
 
   // Background Theme Music Setup
   useEffect(() => {
@@ -123,7 +145,7 @@ export function App() {
     const video = introVideoRef.current;
     if (video) {
       video.currentTime = 0;
-      video.play().catch((e) => console.log('Video play error:', e));
+      video.play().catch(() => triggerSiteReveal());
 
       // As requested: the video zooms into nothingness around ~5.5s to 6.2s.
       // The remaining part is long so we trigger a smooth fade-out and load the website
@@ -133,17 +155,20 @@ export function App() {
         if (video.currentTime >= 5.8) {
           triggerSiteReveal();
         } else {
-          requestAnimationFrame(checkTime);
+          introFrameRef.current = requestAnimationFrame(checkTime);
         }
       };
-      requestAnimationFrame(checkTime);
+      introFrameRef.current = requestAnimationFrame(checkTime);
     }
   };
 
   const triggerSiteReveal = () => {
+    if (revealTimerRef.current) return;
+    cancelAnimationFrame(introFrameRef.current);
     setIntroFading(true);
     setIntroState('exiting');
-    setTimeout(() => {
+    revealTimerRef.current = setTimeout(() => {
+      introVideoRef.current?.pause();
       setIntroState('entered');
     }, 1200); // 1.2s luxurious cinematic crossfade
   };
@@ -161,10 +186,8 @@ export function App() {
 
   const playParchmentSound = () => {
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        if (ctx.state === 'suspended') ctx.resume();
+      const ctx = getSoundContext();
+      if (ctx) {
         const now = ctx.currentTime;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -177,6 +200,7 @@ export function App() {
         gain.connect(ctx.destination);
         osc.start(now);
         osc.stop(now + 0.16);
+        osc.onended = () => { osc.disconnect(); gain.disconnect(); };
       }
     } catch (e) {
       // Audio fallback
@@ -185,10 +209,8 @@ export function App() {
 
   const probeVaultWards = () => {
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        if (ctx.state === 'suspended') ctx.resume();
+      const ctx = getSoundContext();
+      if (ctx) {
         const now = ctx.currentTime;
         // Deep resonant ward rumble
         const osc = ctx.createOscillator();
@@ -203,6 +225,7 @@ export function App() {
         gain.connect(ctx.destination);
         osc.start(now);
         osc.stop(now + 0.8);
+        osc.onended = () => { osc.disconnect(); gain.disconnect(); };
 
         // Arcane celestial harmonics
         [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
@@ -217,21 +240,21 @@ export function App() {
           chimeGain.connect(ctx.destination);
           chimeOsc.start(now + 0.12 + idx * 0.08);
           chimeOsc.stop(now + 1.15 + idx * 0.08);
+          chimeOsc.onended = () => { chimeOsc.disconnect(); chimeGain.disconnect(); };
         });
       }
     } catch (e) {
       console.warn('Ward audio error:', e);
     }
     setWardResonating(true);
-    setTimeout(() => setWardResonating(false), 2400);
+    clearTimeout(wardTimerRef.current);
+    wardTimerRef.current = setTimeout(() => setWardResonating(false), 2400);
   };
 
   const toggleProphetAudio = () => {
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        if (ctx.state === 'suspended') ctx.resume();
+      const ctx = getSoundContext();
+      if (ctx) {
         const now = ctx.currentTime;
         // Enchanted Patronus chime (A-major 9th harmonic arpeggio)
         const notes = [440, 554.37, 659.25, 830.61, 1108.73, 1318.51];
@@ -250,13 +273,15 @@ export function App() {
 
           osc.start(now + idx * 0.08);
           osc.stop(now + idx * 0.08 + 1.85);
+          osc.onended = () => { osc.disconnect(); gain.disconnect(); };
         });
       }
     } catch (e) {
       console.warn('Audio playback error:', e);
     }
     setProphetPlaying(true);
-    setTimeout(() => setProphetPlaying(false), 2400);
+    clearTimeout(prophetTimerRef.current);
+    prophetTimerRef.current = setTimeout(() => setProphetPlaying(false), 2400);
   };
 
   const handleCardTilt = (e) => {
@@ -281,8 +306,36 @@ export function App() {
   };
 
   useEffect(() => {
+    const sections = document.querySelectorAll('.landing-hero, .landing-section');
+    // Offscreen SVG stroke and glow animations were still causing layout and paint every frame.
+    if (!siteVisible) {
+      sections.forEach(section => section.classList.add('animations-paused'));
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => entry.target.classList.toggle('animations-paused', !entry.isIntersecting));
+    }, { rootMargin: '200px 0px' });
+    sections.forEach(section => observer.observe(section));
+    return () => observer.disconnect();
+  }, [siteVisible]);
+
+  useEffect(() => {
     const envelope = envelopeRef.current;
-    if (!envelope) return undefined;
+    if (!envelope || !siteVisible) return undefined;
+
+    const hero = document.querySelector('.landing-hero');
+    const showcase = document.querySelector('.campus-showcase');
+    const heroArt = document.querySelector('.landing-hero-art');
+    const challenge = document.querySelector('.challenge-section');
+    const journey = document.querySelector('.journey-section');
+    const prizes = document.querySelector('.prizes-section');
+    const registration = document.querySelector('.registration-section');
+    const faq = document.querySelector('.faq-section');
+    const footer = document.querySelector('.landing-footer');
+    const sections = [hero, showcase, challenge, journey, prizes, registration, faq, footer];
+    const sectionTops = new Map();
+    let envelopeWidth = envelope.offsetWidth;
+    let scrollDirty = true;
 
     let frameId = 0;
     let lastFrameTime = 0;
@@ -291,11 +344,9 @@ export function App() {
     let attachedToOwl = true;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const getAttachedPose = () => {
-      const heroArt = document.querySelector('.landing-hero-art');
       if (!heroArt) return null;
 
       const rect = heroArt.getBoundingClientRect();
-      const envelopeWidth = envelope.offsetWidth;
       const scale = Math.max(0.14, Math.min(0.42, rect.width * 0.26 / Math.max(1, envelopeWidth)));
       const visibleSizeRatio = envelopeWidth * scale / Math.max(1, rect.width);
       // The envelope's top fold (about 27% across, 23% down its square image)
@@ -309,29 +360,22 @@ export function App() {
     };
 
     const updateScrollTransition = () => {
-      const hero = document.querySelector('.landing-hero');
-      const showcase = document.querySelector('.campus-showcase');
-      const heroArt = document.querySelector('.landing-hero-art');
       if (!hero || !showcase || !heroArt || !envelope) return;
 
       const viewportHeight = window.innerHeight;
       const scrollY = window.scrollY;
-      const absoluteTop = (element) => element.getBoundingClientRect().top + scrollY;
+      const absoluteTop = (element) => {
+        if (!sectionTops.has(element)) sectionTops.set(element, element.getBoundingClientRect().top + scrollY);
+        return sectionTops.get(element);
+      };
       const heroTop = absoluteTop(hero);
       const venueTop = absoluteTop(showcase);
       const heroBottom = absoluteTop(hero) + hero.offsetHeight;
-      const challenge = document.querySelector('.challenge-section');
-      const journey = document.querySelector('.journey-section');
-      const prizes = document.querySelector('.prizes-section');
-      const registration = document.querySelector('.registration-section');
-      const faq = document.querySelector('.faq-section');
-      const footer = document.querySelector('.landing-footer');
       const isNarrow = window.innerWidth <= 640;
       const guideRightX = isNarrow ? 60 : 88;
       const guideLeftX = isNarrow ? 40 : 12;
       const guideTopY = isNarrow ? 22 : 24;
       const guideBottomY = isNarrow ? 76 : 77;
-      const envelopeWidth = envelope.offsetWidth;
       const guideScale = isNarrow ? 0.46 : Math.min(0.48, Math.max(0.39, 300 / envelopeWidth));
       const startAt = heroTop + viewportHeight * 0.18;
       const attachedPose = getAttachedPose();
@@ -388,7 +432,6 @@ export function App() {
       targetPose = pose;
       if (!currentPose) currentPose = { ...pose };
       envelope.style.opacity = '1';
-      if (!frameId) frameId = window.requestAnimationFrame(animateEnvelope);
 
       const guideSections = [showcase, challenge, journey, prizes, registration].filter(Boolean);
       let guideIndex = 0;
@@ -403,6 +446,12 @@ export function App() {
     };
 
     function animateEnvelope(time) {
+      frameId = 0;
+      if (document.hidden) return;
+      if (scrollDirty) {
+        scrollDirty = false;
+        updateScrollTransition();
+      }
       if (!targetPose || !currentPose) {
         frameId = 0;
         return;
@@ -439,15 +488,31 @@ export function App() {
       }
     }
 
-    window.addEventListener('scroll', updateScrollTransition, { passive: true });
-    window.addEventListener('resize', updateScrollTransition);
-    updateScrollTransition();
+    const scheduleUpdate = () => {
+      scrollDirty = true;
+      if (!frameId && !document.hidden) frameId = window.requestAnimationFrame(animateEnvelope);
+    };
+    const refreshLayout = () => {
+      sectionTops.clear();
+      envelopeWidth = envelope.offsetWidth;
+      scheduleUpdate();
+    };
+    // Layout changes (fonts, images, FAQ, menu) invalidate the cached document positions.
+    const observer = new ResizeObserver(refreshLayout);
+    sections.filter(Boolean).forEach(section => observer.observe(section));
+    observer.observe(document.querySelector('.landing-header'));
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', refreshLayout);
+    document.addEventListener('visibilitychange', scheduleUpdate);
+    scheduleUpdate();
     return () => {
-      window.removeEventListener('scroll', updateScrollTransition);
-      window.removeEventListener('resize', updateScrollTransition);
+      observer.disconnect();
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', refreshLayout);
+      document.removeEventListener('visibilitychange', scheduleUpdate);
       if (frameId) window.cancelAnimationFrame(frameId);
     };
-  }, []);
+  }, [siteVisible]);
 
   return (
     <div className={`site-wrapper landing-page ${introState !== 'entered' ? 'intro-active' : ''}`}>
@@ -505,7 +570,7 @@ export function App() {
                   {/* Authentic Golden Parchment Plaque */}
                   <div className="parchment-plaque-shell">
                     <img 
-                      src="/assets/intro/enter_button_clean.png" 
+                      src="/assets/intro/enter_button_clean.webp"
                       alt="ENTER" 
                       className="parchment-plaque-img"
                     />
@@ -541,7 +606,7 @@ export function App() {
         </div>
       )}
 
-      <LumosCanvas />
+      <LumosCanvas enabled={siteVisible} />
       <a
         ref={envelopeRef}
         className="scrolling-seal-guide"
@@ -550,7 +615,7 @@ export function App() {
       >
         <img
           className="scrolling-seal-envelope"
-          src="/assets/v2/Gemini_Generated_Image_5hr7u45hr7u45hr7-clean.png"
+          src="/assets/v2/Gemini_Generated_Image_5hr7u45hr7u45hr7-clean.webp"
           alt=""
           aria-hidden="true"
         />
@@ -560,7 +625,7 @@ export function App() {
       <header className="landing-header">
         <a className="landing-brand" href="#home" aria-label="HexWartz home">
           <img
-            src="/assets/branding/hexwartz_crest_nav.png"
+            src="/assets/branding/hexwartz_crest_nav.webp"
             alt="HexWartz Crest"
             className="landing-brand-crest"
             width="42"
@@ -611,7 +676,7 @@ export function App() {
               <div className="hero-brand-lockup">
                 <img
                   className="hero-character-art"
-                  src="/assets/v2/harry-hero.png"
+                  src="/assets/v2/harry-hero.webp"
                   alt="Harry Potter with Hedwig"
                   fetchPriority="high"
                 />
@@ -700,7 +765,7 @@ export function App() {
               <div className="landing-art-frame">
                 <img
                   className="landing-hero-art"
-                  src="/assets/v2/Gemini_Generated_Image_qshw3cqshw3cqshw-clean%20%281%29.png"
+                  src="/assets/v2/Gemini_Generated_Image_qshw3cqshw3cqshw-clean%20%281%29.webp"
                   alt="HexWartz crest with a moonlit castle, owl, and spellbook"
                   fetchPriority="high"
                 />
@@ -723,12 +788,17 @@ export function App() {
               className={`campus-showcase-image ${showNightCampus ? 'is-hidden' : 'is-visible'}`}
               src="/assets/v2/sharda%20agra.jpg"
               alt="Sharda University Agra campus in daylight"
-              fetchPriority="high"
+              loading="lazy"
+              decoding="async"
+              fetchPriority="low"
             />
             <img
               className={`campus-showcase-image ${showNightCampus ? 'is-visible' : 'is-hidden'}`}
-              src="/assets/v2/Gemini_Generated_Image_msm9x2msm9x2msm9-clean.png"
+              src="/assets/v2/Gemini_Generated_Image_msm9x2msm9x2msm9-clean.webp"
               alt="Sharda University Agra campus at night"
+              loading="lazy"
+              decoding="async"
+              fetchPriority="low"
             />
             <div className="campus-showcase-shade" />
             <div className="campus-showcase-caption">
@@ -1199,7 +1269,7 @@ export function App() {
                   </div>
                   <div className="moving-photo-inner">
                     <img 
-                      src="/assets/sprites/harry_hedwig.png" 
+                      src="/assets/sprites/harry_hedwig.webp"
                       alt="Bewitched moving photograph of Harry Potter and Hedwig" 
                       className="prophet-moving-photo"
                       loading="lazy"
@@ -1385,7 +1455,7 @@ export function App() {
       <footer className="landing-footer">
         <a className="landing-brand" href="#home" aria-label="HexWartz home">
           <img
-            src="/assets/branding/hexwartz_crest_nav.png"
+            src="/assets/branding/hexwartz_crest_nav.webp"
             alt="HexWartz Crest"
             className="landing-brand-crest"
             width="42"
@@ -1415,7 +1485,7 @@ export function App() {
       <audio 
         ref={audioRef}
         src="/music/theme.mp3"
-        preload="auto"
+        preload="none"
         loop
       />
 
