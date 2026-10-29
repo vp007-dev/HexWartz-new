@@ -4247,6 +4247,7 @@ html { scroll-padding-top: 92px; }
 @media (max-width: 640px) {
   html { scroll-padding-top: 72px; }
   .landing-hero { padding: 36px 16px 20px; }
+  .hero-floating-candles { top: 0; right: -1%; width: 72px; }
   .landing-hero-inner { gap: 32px; }
   .hero-brand-lockup {
     gap: 12px;
@@ -4401,6 +4402,12 @@ html { scroll-padding-top: 92px; }
   border-radius: 999px;
   font-size: 0.73rem;
   box-shadow: 0 5px 18px rgba(218, 169, 83, 0.16);
+}
+
+.landing-nav .landing-nav-cta:hover,
+.landing-nav .landing-nav-cta:focus-visible {
+  color: #21170a;
+  background: #f4dda8;
 }
 
 @media (max-width: 900px) {

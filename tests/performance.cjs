@@ -62,6 +62,15 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('.magic-mote').count(), 14);
         assert.ok(await page.locator('.hero-floating-candles').evaluate(image => image.complete && image.naturalWidth > 0));
         assert.equal(await page.evaluate(() => performance.getEntriesByType('resource').some(r => r.name.includes('Gemini_Generated_Image_izvipmizvipmizvi'))), false, 'The old large backdrop must not download');
+        if (name === 'mobile') {
+          const candle = await page.locator('.hero-floating-candles').boundingBox();
+          const guidelines = await page.locator('.hero-btn-secondary').boundingBox();
+          assert.ok(candle.y >= guidelines.y + guidelines.height, 'Candles must not overlap the mobile actions');
+        } else {
+          await page.locator('.landing-nav-cta').hover();
+          assert.equal(await page.locator('.landing-nav-cta').evaluate(e => getComputedStyle(e).color), 'rgb(33, 23, 10)');
+          await page.mouse.move(0, 0);
+        }
       }
       // Freeze only the screenshot, so animation timing and random particles do not mask visual regressions.
       await page.evaluate(() => { document.getAnimations().forEach(a => { a.pause(); a.currentTime = 0; }); const atmosphere = document.querySelector('.enchanted-atmosphere, canvas'); if (atmosphere) atmosphere.style.visibility = 'hidden'; });

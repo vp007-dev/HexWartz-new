@@ -1,5 +1,15 @@
 # Performance investigation
 
+## Wizarding atmosphere refinement
+
+The later visual refinement replaces `LumosCanvas.jsx` entirely with `EnchantedAtmosphere.jsx`: 14 sparse gold motes use only CSS transform/opacity animation. There is no particle JavaScript animation loop or full-screen canvas. The owl guide retains its separate animation and scroll caching.
+
+The 2.89 MB background image is no longer requested. Midnight CSS backgrounds replace it, and a 41.6 KB transparent candle asset adds a Great Hall detail. Existing transparent crest and character artwork are retained. Crest rings are now static, button glows are softer, keyboard focus is visible on the intro and music controls, and the registration link retains readable contrast on hover. Reduced motion disables the new dust and candle movement.
+
+The initial measurements and canvas microbenchmark below describe the first performance pass. The browser checks have been updated for the CSS atmosphere, no background-image request, mobile decoration clearance, hover contrast, and reduced motion. The exact section geometry remains a regression check.
+
+## Initial performance pass
+
 Reviewed the application entry point, both canvas/scene components, sound code, the complete stylesheet, package configuration, HTML, and public media references. The active page is `src/main.jsx`; `ArcaneScene.jsx` and `sound.js` are not imported. Three.js, Lenis, and Framer Motion are therefore not responsible for this page's runtime lag.
 
 ## Causes and changes
